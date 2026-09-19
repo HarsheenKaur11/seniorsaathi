@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #fdfbf7;
+    --text-main: #1f2937;
+    --font-base: 18px;
+  }
+
+  html[data-text-size="standard"] {
+    font-size: 18px;
+  }
+
+  html[data-text-size="large"] {
+    font-size: 20px;
+  }
+
+  html[data-text-size="xlarge"] {
+    font-size: 23px;
+  }
+
+  /* High Contrast overrides */
+  html[data-contrast="high"] {
+    --bg-primary: #0a0a0a;
+    --text-main: #ffffff;
+    background-color: #000000 !important;
+    color: #ffffff !important;
+  }
+
+  html[data-contrast="high"] body {
+    background-color: #050505 !important;
+    color: #ffffff !important;
+  }
+
+  html[data-contrast="high"] .bg-white {
+    background-color: #121212 !important;
+    color: #ffffff !important;
+    border-color: #facc15 !important;
+  }
+
+  html[data-contrast="high"] .bg-emerald-50,
+  html[data-contrast="high"] .bg-emerald-100 {
+    background-color: #172554 !important;
+    color: #ffffff !important;
+  }
+
+  html[data-contrast="high"] .bg-emerald-900 {
+    background-color: #000000 !important;
+    border-bottom-color: #facc15 !important;
+  }
+
+  html[data-contrast="high"] .text-emerald-950,
+  html[data-contrast="high"] .text-zinc-900 {
+    color: #ffffff !important;
+  }
+
+  html[data-contrast="high"] .bg-amber-400 {
+    background-color: #facc15 !important;
+    color: #000000 !important;
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-main);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  /* Focus Ring */
+  *:focus-visible {
+    outline: 4px solid #d97706 !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Generous touch targets */
+  button, a, input, textarea, select {
+    min-height: 48px;
+  }
+}
