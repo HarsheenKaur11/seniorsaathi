@@ -3,10 +3,34 @@
 import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { TTSButton } from "@/components/tts-button";
-import { getStoredSettings, AccessibilitySettings, DEFAULT_SETTINGS, addRecentActivity } from "@/lib/storage";
+import { StuckModal } from "@/components/stuck-modal";
+import {
+  getStoredSettings,
+  AccessibilitySettings,
+  DEFAULT_SETTINGS,
+  addRecentActivity,
+  saveActiveTaskState,
+  saveStoredTip,
+  SavedTipItem,
+} from "@/lib/storage";
 import { TRANSLATIONS } from "@/lib/translations";
 import { TaskResponse, TaskHelpResponse } from "@/lib/ai/schemas";
-import { ListChecks, ArrowLeft, Check, HelpCircle, Loader2, Sparkles, AlertTriangle, ArrowRight, Home, RefreshCw } from "lucide-react";
+import {
+  ListChecks,
+  ArrowLeft,
+  Check,
+  HelpCircle,
+  Loader2,
+  Sparkles,
+  AlertTriangle,
+  ArrowRight,
+  Home,
+  BookOpen,
+  Lightbulb,
+  ShieldCheck,
+  Bookmark,
+  CheckCircle2,
+} from "lucide-react";
 
 function GuideContent() {
   const searchParams = useSearchParams();
@@ -19,8 +43,15 @@ function GuideContent() {
   const [taskData, setTaskData] = useState<TaskResponse | null>(null);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
-  const [helpLoading, setHelpLoading] = useState(false);
-  const [stepHelp, setStepHelp] = useState<TaskHelpResponse | null>(null);
+  // Teach Me Mode Toggle
+  const [teachMeMode, setTeachMeMode] = useState(false);
+
+  // Stuck Modal
+  const [stuckOpen, setStuckOpen] = useState(false);
+  const [stuckExplanation, setStuckExplanation] = useState<string | null>(null);
+
+  // Saved Tip State
+  const [tipSaved, setTipSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,7 +64,8 @@ function GuideContent() {
     setError(null);
     setTaskData(null);
     setCurrentStepIndex(0);
-    setStepHelp(null);
+    setStuckExplanation(null);
+    setTipSaved(false);
 
     try {
       const res = await fetch("/api/ai/task", {
@@ -52,6 +84,16 @@ function GuideContent() {
 
       setTaskData(json.data);
       addRecentActivity(`Guided Task: ${goal.slice(0, 20)}...`, "guide");
+
+      // Save active task for home continuation
+      saveActiveTaskState({
+        title: json.data.title,
+        currentStepIndex: 0,
+        totalSteps: json.data.totalSteps,
+        taskGoal: goal.trim(),
+        steps: json.data.steps,
+        timestamp: new Date().toISOString(),
+      });
     } catch (e: any) {
       setError(e?.message || "Could not fetch guided task steps.");
     } finally {
@@ -72,45 +114,59 @@ function GuideContent() {
 
   const handleNextStep = () => {
     if (!taskData) return;
-    setStepHelp(null);
-    if (currentStepIndex < taskData.steps.length - 1) {
-      setCurrentStepIndex((prev) => prev + 1);
+    setStuckExplanation(null);
+    const nextIdx = currentStepIndex + 1;
+    if (nextIdx < taskData.steps.length) {
+      setCurrentStepIndex(nextIdx);
+      saveActiveTaskState({
+        title: taskData.title,
+        currentStepIndex: nextIdx,
+        totalSteps: taskData.totalSteps,
+        taskGoal: taskQuery,
+        steps: taskData.steps,
+        timestamp: new Date().toISOString(),
+      });
     } else {
       setCurrentStepIndex(taskData.steps.length); // Completion state
+      saveActiveTaskState(null); // Clear active task on completion
     }
   };
 
   const handlePrevStep = () => {
-    setStepHelp(null);
+    setStuckExplanation(null);
     if (currentStepIndex > 0) {
-      setCurrentStepIndex((prev) => prev - 1);
+      const prevIdx = currentStepIndex - 1;
+      setCurrentStepIndex(prevIdx);
+      if (taskData) {
+        saveActiveTaskState({
+          title: taskData.title,
+          currentStepIndex: prevIdx,
+          totalSteps: taskData.totalSteps,
+          taskGoal: taskQuery,
+          steps: taskData.steps,
+          timestamp: new Date().toISOString(),
+        });
+      }
     }
   };
 
-  const handleRequestHelp = async () => {
-    if (!taskData || !taskData.steps[currentStepIndex]) return;
-    setHelpLoading(true);
+  const handleSaveConfidenceTip = () => {
+    if (!taskData || !taskData.confidenceTip) return;
+    saveStoredTip({
+      taskTitle: taskData.title,
+      tip: taskData.confidenceTip,
+    });
+    setTipSaved(true);
+  };
 
-    try {
-      const currentStep = taskData.steps[currentStepIndex];
-      const res = await fetch("/api/ai/task/help", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          currentStep,
-          taskTitle: taskData.title,
-          language: settings.language,
-        }),
-      });
-
-      const json = await res.json();
-      if (res.ok) {
-        setStepHelp(json.data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setHelpLoading(false);
+  const handleStuckRecoveryChoice = (actionType: "explain_simpler" | "step_by_step" | "previous_step") => {
+    if (actionType === "previous_step") {
+      handlePrevStep();
+    } else if (actionType === "explain_simpler") {
+      setTeachMeMode(true);
+      setStuckExplanation("Switched to Teach Me mode to explain why this step matters.");
+    } else {
+      setStuckExplanation("Look at the highlighted on-screen options or controls on your phone.");
     }
   };
 
@@ -129,7 +185,7 @@ function GuideContent() {
         </button>
         <h2 className="text-2xl sm:text-3xl font-black text-teal-950 dark:text-teal-100 flex items-center gap-2">
           <ListChecks className="w-8 h-8 text-teal-600" />
-          Guided Task Mode
+          Guided Task Mode V2
         </h2>
       </div>
 
@@ -175,7 +231,7 @@ function GuideContent() {
       {/* Active Step-by-Step Workflow */}
       {taskData && !loading && (
         <div className="space-y-6">
-          {/* Progress Indicator */}
+          {/* Progress Bar & Teach Me Mode Switch */}
           <div className="bg-white dark:bg-zinc-800 p-6 rounded-3xl border-2 border-teal-200 dark:border-zinc-700 flex flex-wrap items-center justify-between gap-4 shadow-sm">
             <div>
               <p className="text-sm font-bold uppercase text-teal-700 dark:text-teal-400 tracking-wider">
@@ -188,20 +244,21 @@ function GuideContent() {
               </h3>
             </div>
 
-            {/* Visual Step Dots */}
-            <div className="flex items-center gap-2">
-              {taskData.steps.map((_, idx) => (
-                <span
-                  key={idx}
-                  className={`w-4 h-4 rounded-full transition-all ${
-                    idx === currentStepIndex
-                      ? "bg-teal-700 scale-125 ring-4 ring-teal-200"
-                      : idx < currentStepIndex
-                      ? "bg-emerald-500"
-                      : "bg-zinc-300 dark:bg-zinc-700"
-                  }`}
-                />
-              ))}
+            {/* Teach Me Mode Toggle */}
+            <div className="flex items-center gap-3 bg-teal-50 dark:bg-zinc-900 p-2.5 rounded-2xl border border-teal-200 dark:border-zinc-700">
+              <BookOpen className="w-5 h-5 text-teal-700 dark:text-teal-400" />
+              <span className="font-bold text-sm text-teal-950 dark:text-teal-200">Teach Me Mode</span>
+              <button
+                type="button"
+                onClick={() => setTeachMeMode(!teachMeMode)}
+                aria-checked={teachMeMode}
+                role="switch"
+                className={`w-12 h-7 rounded-full p-1 transition-colors flex items-center ${
+                  teachMeMode ? "bg-teal-700 justify-end" : "bg-zinc-300 dark:bg-zinc-600 justify-start"
+                }`}
+              >
+                <span className="w-5 h-5 rounded-full bg-white shadow-md block" />
+              </button>
             </div>
           </div>
 
@@ -215,7 +272,11 @@ function GuideContent() {
                 </span>
 
                 <TTSButton
-                  text={taskData.steps[currentStepIndex].instruction + ". " + (taskData.steps[currentStepIndex].simplifiedExplanation || "")}
+                  text={
+                    taskData.steps[currentStepIndex].instruction +
+                    ". " +
+                    (taskData.steps[currentStepIndex].simplifiedExplanation || "")
+                  }
                   language={settings.language}
                 />
               </div>
@@ -233,29 +294,47 @@ function GuideContent() {
                 )}
               </div>
 
-              {/* Step Danger Warning if present */}
+              {/* TEACH ME MODE EXTRA DETAILS (WHY IT MATTERS & SAFETY TIP) */}
+              {teachMeMode && (
+                <div className="space-y-3 bg-amber-50 dark:bg-amber-950/40 p-6 rounded-2xl border-2 border-amber-300 space-y-3">
+                  {taskData.steps[currentStepIndex].whyThisMatters && (
+                    <div className="space-y-1">
+                      <p className="font-black text-lg text-amber-950 dark:text-amber-200 flex items-center gap-2">
+                        <BookOpen className="w-5 h-5 text-amber-600" />
+                        WHY THIS MATTERS
+                      </p>
+                      <p className="text-base font-semibold text-amber-900 dark:text-amber-300">
+                        {taskData.steps[currentStepIndex].whyThisMatters}
+                      </p>
+                    </div>
+                  )}
+
+                  {taskData.steps[currentStepIndex].safetyTip && (
+                    <div className="pt-2 border-t border-amber-200 dark:border-amber-900 space-y-1">
+                      <p className="font-black text-base text-amber-950 dark:text-amber-200 flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                        SAFETY TIP
+                      </p>
+                      <p className="text-base font-semibold text-amber-900 dark:text-amber-300">
+                        {taskData.steps[currentStepIndex].safetyTip}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Step Danger Warning */}
               {taskData.steps[currentStepIndex].dangerWarning && (
-                <div className="p-4 bg-amber-50 dark:bg-amber-950/60 border-2 border-amber-400 rounded-2xl text-amber-950 dark:text-amber-200 font-bold flex items-center gap-3">
-                  <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
+                <div className="p-4 bg-red-50 dark:bg-red-950/60 border-2 border-red-400 rounded-2xl text-red-950 dark:text-red-200 font-bold flex items-center gap-3">
+                  <AlertTriangle className="w-6 h-6 text-red-600 shrink-0" />
                   <span>{taskData.steps[currentStepIndex].dangerWarning}</span>
                 </div>
               )}
 
-              {/* Additional Step Help Box */}
-              {stepHelp && (
-                <div className="bg-amber-100 dark:bg-zinc-900 border-2 border-amber-400 p-6 rounded-2xl space-y-3">
-                  <p className="font-black text-xl text-amber-950 dark:text-amber-200 flex items-center gap-2">
-                    <HelpCircle className="w-6 h-6 text-amber-600" />
-                    Extra Simple Help
-                  </p>
-                  <p className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
-                    {stepHelp.simpleExplanation}
-                  </p>
-                  <ul className="list-disc pl-6 space-y-1 font-medium text-base">
-                    {stepHelp.tips.map((tip, idx) => (
-                      <li key={idx}>{tip}</li>
-                    ))}
-                  </ul>
+              {/* Stuck explanation callout */}
+              {stuckExplanation && (
+                <div className="p-4 bg-teal-100 dark:bg-zinc-900 border border-teal-400 rounded-2xl text-teal-950 dark:text-teal-200 font-bold">
+                  💡 {stuckExplanation}
                 </div>
               )}
 
@@ -271,12 +350,11 @@ function GuideContent() {
                   </button>
 
                   <button
-                    onClick={handleRequestHelp}
-                    disabled={helpLoading}
+                    onClick={() => setStuckOpen(true)}
                     className="px-5 py-4 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 text-amber-950 dark:text-amber-200 font-bold text-lg rounded-2xl border-2 border-amber-300 flex items-center gap-2 min-h-[56px]"
                   >
-                    {helpLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <HelpCircle className="w-5 h-5" />}
-                    <span>? I need help</span>
+                    <HelpCircle className="w-5 h-5 text-amber-600" />
+                    <span>I’m stuck</span>
                   </button>
                 </div>
 
@@ -290,7 +368,7 @@ function GuideContent() {
               </div>
             </div>
           ) : (
-            /* COMPLETION STATE */
+            /* COMPLETION STATE & DIGITAL CONFIDENCE CARD */
             <div className="bg-emerald-50 dark:bg-zinc-800 p-8 sm:p-12 rounded-3xl border-4 border-emerald-500 shadow-2xl text-center space-y-6">
               <div className="w-20 h-20 rounded-full bg-emerald-700 text-white flex items-center justify-center font-black text-4xl mx-auto shadow-lg animate-bounce">
                 🎉
@@ -302,6 +380,40 @@ function GuideContent() {
                 {taskData.completionMessage}
               </p>
 
+              {/* DIGITAL CONFIDENCE CARD OFFER */}
+              {taskData.confidenceTip && (
+                <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border-2 border-amber-400 max-w-lg mx-auto space-y-3 shadow-md text-left">
+                  <div className="flex items-center gap-2 font-black text-amber-950 dark:text-amber-200 text-lg">
+                    <Lightbulb className="w-6 h-6 text-amber-500" />
+                    Remember This Confidence Tip
+                  </div>
+                  <p className="text-lg font-semibold text-zinc-800 dark:text-zinc-200">
+                    "{taskData.confidenceTip}"
+                  </p>
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      onClick={handleSaveConfidenceTip}
+                      disabled={tipSaved}
+                      className={`px-5 py-3 rounded-xl font-bold text-base flex items-center gap-2 min-h-[48px] ${
+                        tipSaved
+                          ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200 border border-emerald-400"
+                          : "bg-amber-400 hover:bg-amber-300 text-emerald-950 shadow-md"
+                      }`}
+                    >
+                      {tipSaved ? (
+                        <>
+                          <CheckCircle2 className="w-5 h-5 text-emerald-700" /> Tip Saved to My Cards!
+                        </>
+                      ) : (
+                        <>
+                          <Bookmark className="w-5 h-5" /> Save Tip to My Cards
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="pt-6 flex flex-wrap items-center justify-center gap-4">
                 <button
                   onClick={() => router.push("/")}
@@ -311,23 +423,33 @@ function GuideContent() {
                 </button>
 
                 <button
-                  onClick={() => router.push("/reminders")}
+                  onClick={() => router.push("/tips")}
                   className="px-8 py-4 bg-amber-400 text-emerald-950 font-black text-xl rounded-2xl flex items-center gap-2 shadow-md hover:bg-amber-300 min-h-[56px]"
                 >
-                  Set a Reminder
+                  View My Confidence Cards
                 </button>
               </div>
             </div>
           )}
         </div>
       )}
+
+      {/* Stuck Modal */}
+      <StuckModal
+        isOpen={stuckOpen}
+        onClose={() => setStuckOpen(false)}
+        contextText={taskQuery}
+        currentStep={taskData?.steps[currentStepIndex]}
+        language={settings.language}
+        onSelectOption={handleStuckRecoveryChoice}
+      />
     </div>
   );
 }
 
 export default function GuidePage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Guided Task...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Guided Task V2...</div>}>
       <GuideContent />
     </Suspense>
   );

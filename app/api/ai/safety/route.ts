@@ -34,7 +34,8 @@ Output JSON matching schema:
   "safeActions": ["What the user should do to stay safe 1", "What the user should do to stay safe 2"],
   "neverShare": ["NEVER share your OTP", "NEVER share your bank PIN"],
   "confidence": "High confidence based on threat analysis",
-  "guideTaskTitle": "How to safely handle this suspicious message"
+  "guideTaskTitle": "How to safely handle this suspicious message",
+  "extractedDomains": ["example-domain.com"]
 }
 
 ${getLanguageInstruction(language)}
@@ -69,6 +70,7 @@ ${getLanguageInstruction(language)}
           neverShare: neverShareList,
           confidence: "High risk detected by security heuristics",
           guideTaskTitle: "What to do when you receive a suspicious scam message",
+          extractedDomains: heuristic.extractedDomains,
         };
       }
 
@@ -87,6 +89,7 @@ ${getLanguageInstruction(language)}
           neverShare: neverShareList,
           confidence: "Caution recommended",
           guideTaskTitle: "How to safely check and verify suspicious messages",
+          extractedDomains: heuristic.extractedDomains,
         };
       }
 
@@ -101,6 +104,7 @@ ${getLanguageInstruction(language)}
         neverShare: neverShareList,
         confidence: "Low risk detected",
         guideTaskTitle: "How to handle general online messages safely",
+        extractedDomains: heuristic.extractedDomains,
       };
     };
 
@@ -124,6 +128,11 @@ ${getLanguageInstruction(language)}
     const mandatoryNeverShare = ["OTP", "PIN", "CVV", "Passwords"];
     const mergedNeverShare = Array.from(new Set([...result.data.neverShare, ...heuristic.neverShareAlerts, ...mandatoryNeverShare]));
     result.data.neverShare = mergedNeverShare;
+
+    if (heuristic.extractedDomains.length > 0) {
+      const mergedDomains = Array.from(new Set([...(result.data.extractedDomains || []), ...heuristic.extractedDomains]));
+      result.data.extractedDomains = mergedDomains;
+    }
 
     return NextResponse.json(result);
   } catch (err: any) {

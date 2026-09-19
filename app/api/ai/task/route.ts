@@ -28,10 +28,13 @@ Output JSON matching schema:
       "instruction": "One single clear action step to perform right now",
       "simplifiedExplanation": "Gentle explanation in plain everyday words",
       "whyThisStep": "Briefly why this step is helpful",
+      "whyThisMatters": "Teaches the user WHY this setting or action matters for long-term independence",
+      "safetyTip": "Simple safety tip for this specific action",
       "dangerWarning": "Optional warning if this step involves privacy/money"
     }
   ],
-  "completionMessage": "You did it 🎉 Great job staying safe and completing this task!"
+  "completionMessage": "You did it 🎉 Great job staying safe and completing this task!",
+  "confidenceTip": "Short memorable lesson for next time e.g., 'Banks will never ask you to share OTP over message or call.'"
 }
 
 ${getLanguageInstruction(language)}
@@ -47,6 +50,8 @@ ${getLanguageInstruction(language)}
             instruction: "Stop and inspect the details carefully without rushing.",
             simplifiedExplanation: "Take a deep breath. Scammers count on speed. Going slowly keeps you safe.",
             whyThisStep: "Helps you maintain full control of your actions.",
+            whyThisMatters: "Taking your time builds confidence and prevents accidental taps on unfamiliar screens.",
+            safetyTip: "Never rush when a digital message demands quick action.",
             dangerWarning: "Never enter your OTP or bank PIN.",
           },
           {
@@ -54,21 +59,28 @@ ${getLanguageInstruction(language)}
             instruction: "Verify who sent the message or request.",
             simplifiedExplanation: "Check if the name, official phone number, or email matches your official bank/service documents.",
             whyThisStep: "Ensures you are dealing with a real trusted company.",
+            whyThisMatters: "Official companies always use registered domain names and numbers.",
+            safetyTip: "Compare phone numbers with the number printed on the back of your physical card.",
           },
           {
             stepNumber: 3,
             instruction: "Use official apps or call official helpline numbers directly.",
             simplifiedExplanation: "Open your official app store or look at the back of your bank card for the real customer phone number.",
             whyThisStep: "Bypasses suspicious links or fake numbers.",
+            whyThisMatters: "Opening official apps directly avoids phishing websites entirely.",
+            safetyTip: "Do not click links sent inside SMS or chat messages.",
           },
           {
             stepNumber: 4,
             instruction: "Mark the task complete or inform a trusted relative.",
             simplifiedExplanation: "If you feel completely confident, complete your task. If in doubt, ask a trusted family member.",
             whyThisStep: "Protects your peace of mind.",
+            whyThisMatters: "Sharing digital questions with trusted family strengthens your online safety.",
+            safetyTip: "Use Safe Share to check messages with family without sharing secrets.",
           },
         ],
         completionMessage: "You did it 🎉 You completed all the steps safely!",
+        confidenceTip: "Remember: Official banks and services will never ask for your PIN or OTP.",
       };
     };
 

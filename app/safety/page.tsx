@@ -4,10 +4,25 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { VoiceInput } from "@/components/voice-input";
 import { TTSButton } from "@/components/tts-button";
+import { SafeShareModal } from "@/components/safe-share-modal";
+import { StuckModal } from "@/components/stuck-modal";
 import { getStoredSettings, AccessibilitySettings, DEFAULT_SETTINGS, addRecentActivity } from "@/lib/storage";
 import { TRANSLATIONS } from "@/lib/translations";
 import { SafetyResponse } from "@/lib/ai/schemas";
-import { ShieldAlert, ShieldCheck, AlertOctagon, ArrowLeft, Loader2, ArrowRight, Lock, HelpCircle, CheckCircle2, ListChecks } from "lucide-react";
+import {
+  ShieldAlert,
+  ShieldCheck,
+  AlertOctagon,
+  ArrowLeft,
+  Loader2,
+  ArrowRight,
+  Lock,
+  HelpCircle,
+  CheckCircle2,
+  ListChecks,
+  Share2,
+  Globe,
+} from "lucide-react";
 
 function SafetyContent() {
   const searchParams = useSearchParams();
@@ -19,6 +34,11 @@ function SafetyContent() {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<SafetyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Safe Share Modal
+  const [shareOpen, setShareOpen] = useState(false);
+  // Stuck Modal
+  const [stuckOpen, setStuckOpen] = useState(false);
 
   useEffect(() => {
     setSettings(getStoredSettings());
@@ -82,7 +102,7 @@ function SafetyContent() {
         </button>
         <h2 className="text-2xl sm:text-3xl font-black text-amber-950 dark:text-amber-200 flex items-center gap-2">
           <ShieldAlert className="w-8 h-8 text-amber-600" />
-          Scam & Safety Check
+          Safety Check V2
         </h2>
       </div>
 
@@ -173,10 +193,20 @@ function SafetyContent() {
               </div>
             </div>
 
-            <TTSButton
-              text={`Risk level: ${response.riskLevel}. ${response.overallExplanation}`}
-              language={settings.language}
-            />
+            <div className="flex items-center gap-2">
+              <TTSButton
+                text={`Risk level: ${response.riskLevel}. ${response.overallExplanation}`}
+                language={settings.language}
+              />
+              <button
+                onClick={() => setShareOpen(true)}
+                className="px-4 py-3 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 text-amber-950 dark:text-amber-200 rounded-xl font-bold border border-amber-400 flex items-center gap-2 min-h-[48px]"
+                title="Safe Share with Family"
+              >
+                <Share2 className="w-5 h-5" />
+                <span>Safe Share</span>
+              </button>
+            </div>
           </div>
 
           {/* Encouragement note */}
@@ -193,6 +223,23 @@ function SafetyContent() {
               {response.overallExplanation}
             </p>
           </div>
+
+          {/* Extracted Domain Warnings */}
+          {response.extractedDomains && response.extractedDomains.length > 0 && (
+            <div className="p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-300 rounded-2xl space-y-2">
+              <p className="font-bold text-lg text-blue-950 dark:text-blue-200 flex items-center gap-2">
+                <Globe className="w-5 h-5 text-blue-600" />
+                Website Domain Analysis
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {response.extractedDomains.map((dom, idx) => (
+                  <span key={idx} className="px-3 py-1 bg-white dark:bg-zinc-800 rounded-xl font-mono text-sm font-bold text-blue-900 dark:text-blue-300 border border-blue-200">
+                    🌐 {dom}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* WHY? Warning Signs */}
           {response.warningSigns.length > 0 && (
@@ -241,8 +288,16 @@ function SafetyContent() {
             </div>
           </div>
 
-          {/* Launch Guided Task Mode */}
-          <div className="pt-6 border-t border-zinc-200 dark:border-zinc-700 flex justify-end">
+          {/* Launch Guided Task Mode & Stuck Handler */}
+          <div className="pt-6 border-t border-zinc-200 dark:border-zinc-700 flex flex-wrap items-center justify-between gap-4">
+            <button
+              onClick={() => setStuckOpen(true)}
+              className="px-5 py-4 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 text-amber-950 dark:text-amber-200 font-bold text-lg rounded-2xl border border-amber-300 flex items-center gap-2 min-h-[56px]"
+            >
+              <HelpCircle className="w-5 h-5 text-amber-600" />
+              <span>I’m stuck</span>
+            </button>
+
             <button
               onClick={() => {
                 const taskPrompt = response.guideTaskTitle || `How to safely handle this message: ${messageInput.slice(0, 50)}`;
@@ -257,6 +312,32 @@ function SafetyContent() {
           </div>
         </div>
       )}
+
+      {/* Safe Share Modal */}
+      {response && (
+        <SafeShareModal
+          isOpen={shareOpen}
+          onClose={() => setShareOpen(false)}
+          messageText={messageInput}
+          riskLevel={response.riskLevel}
+          warningSigns={response.warningSigns}
+        />
+      )}
+
+      {/* Stuck Modal */}
+      <StuckModal
+        isOpen={stuckOpen}
+        onClose={() => setStuckOpen(false)}
+        contextText={messageInput}
+        language={settings.language}
+        onSelectOption={(actionType) => {
+          if (actionType === "explain_simpler") {
+            router.push(`/simplify?q=${encodeURIComponent(messageInput)}`);
+          } else {
+            router.push(`/guide?task=${encodeURIComponent(messageInput)}`);
+          }
+        }}
+      />
     </div>
   );
 }

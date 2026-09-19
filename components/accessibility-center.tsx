@@ -10,9 +10,11 @@ import {
   TextSize,
   ContrastMode,
   Language,
+  AssistanceLevel,
 } from "@/lib/storage";
+import { ThemeSwitcher } from "./theme-switcher";
 import { TRANSLATIONS } from "@/lib/translations";
-import { Settings, Eye, Type, Volume2, Globe, Trash2, X, Check } from "lucide-react";
+import { Settings, Eye, Type, Volume2, Globe, Trash2, X, Check, HeartHandshake } from "lucide-react";
 
 interface AccessibilityCenterProps {
   isOpen: boolean;
@@ -36,7 +38,7 @@ export function AccessibilityCenter({ isOpen, onClose, onSettingsChange }: Acces
   };
 
   const handleForget = () => {
-    if (confirm("Reset all stored accessibility and reminder preferences?")) {
+    if (confirm("Reset all stored accessibility, reminders, and confidence tips preferences?")) {
       clearAllPreferences();
       setSettings(DEFAULT_SETTINGS);
       if (onSettingsChange) onSettingsChange(DEFAULT_SETTINGS);
@@ -55,7 +57,7 @@ export function AccessibilityCenter({ isOpen, onClose, onSettingsChange }: Acces
       aria-modal="true"
       aria-labelledby="acc-title"
     >
-      <div className="bg-emerald-50 dark:bg-zinc-900 border-2 border-emerald-700 dark:border-emerald-500 rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 text-zinc-900 dark:text-zinc-100">
+      <div className="bg-emerald-50 dark:bg-zinc-900 border-2 border-emerald-700 dark:border-emerald-500 rounded-3xl p-6 sm:p-8 max-w-xl w-full shadow-2xl space-y-6 text-zinc-900 dark:text-zinc-100 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-emerald-200 dark:border-zinc-700 pb-4">
           <div className="flex items-center gap-3">
             <Settings className="w-8 h-8 text-emerald-800 dark:text-emerald-400" />
@@ -73,18 +75,47 @@ export function AccessibilityCenter({ isOpen, onClose, onSettingsChange }: Acces
         </div>
 
         <div className="space-y-6">
+          {/* Display Theme */}
+          <ThemeSwitcher />
+
+          {/* Assistance Level */}
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 font-bold text-lg text-emerald-950 dark:text-emerald-200">
+              <HeartHandshake className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
+              How Much Help Would You Like?
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {(["gentle", "standard", "independent"] as AssistanceLevel[]).map((lvl) => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => updateSetting("assistanceLevel", lvl)}
+                  className={`py-3 px-3 rounded-xl border-2 font-semibold capitalize text-sm sm:text-base min-h-[52px] transition-all flex items-center justify-center gap-1 ${
+                    settings.assistanceLevel === lvl
+                      ? "bg-emerald-800 text-white border-emerald-900 shadow-md"
+                      : "bg-white dark:bg-zinc-800 border-emerald-300 dark:border-zinc-600 hover:border-emerald-600"
+                  }`}
+                >
+                  {settings.assistanceLevel === lvl && <Check className="w-4 h-4" />}
+                  {lvl === "gentle" ? "Gentle" : lvl === "standard" ? "Standard" : "Independent"}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Text Size */}
           <div className="space-y-3">
             <label className="flex items-center gap-2 font-bold text-lg text-emerald-950 dark:text-emerald-200">
               <Type className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
               {t.textSize}
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {(["standard", "large", "xlarge"] as TextSize[]).map((size) => (
                 <button
                   key={size}
+                  type="button"
                   onClick={() => updateSetting("textSize", size)}
-                  className={`py-3 px-4 rounded-xl border-2 font-semibold capitalize text-base sm:text-lg min-h-[52px] transition-all flex items-center justify-center gap-1 ${
+                  className={`py-3 px-3 rounded-xl border-2 font-semibold capitalize text-sm sm:text-base min-h-[52px] transition-all flex items-center justify-center gap-1 ${
                     settings.textSize === size
                       ? "bg-emerald-800 text-white border-emerald-900 shadow-md"
                       : "bg-white dark:bg-zinc-800 border-emerald-300 dark:border-zinc-600 hover:border-emerald-600"
@@ -107,8 +138,9 @@ export function AccessibilityCenter({ isOpen, onClose, onSettingsChange }: Acces
               {(["standard", "high"] as ContrastMode[]).map((mode) => (
                 <button
                   key={mode}
+                  type="button"
                   onClick={() => updateSetting("contrast", mode)}
-                  className={`py-3 px-4 rounded-xl border-2 font-semibold text-base sm:text-lg min-h-[52px] transition-all flex items-center justify-center gap-2 ${
+                  className={`py-3 px-4 rounded-xl border-2 font-semibold text-base min-h-[52px] transition-all flex items-center justify-center gap-2 ${
                     settings.contrast === mode
                       ? "bg-emerald-800 text-white border-emerald-900 shadow-md"
                       : "bg-white dark:bg-zinc-800 border-emerald-300 dark:border-zinc-600 hover:border-emerald-600"
@@ -127,12 +159,13 @@ export function AccessibilityCenter({ isOpen, onClose, onSettingsChange }: Acces
               <Globe className="w-5 h-5 text-emerald-700 dark:text-emerald-400" />
               {t.language}
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2">
               {(["English", "Hindi", "Punjabi"] as Language[]).map((lang) => (
                 <button
                   key={lang}
+                  type="button"
                   onClick={() => updateSetting("language", lang)}
-                  className={`py-3 px-3 rounded-xl border-2 font-bold text-base sm:text-lg min-h-[52px] transition-all flex items-center justify-center gap-1 ${
+                  className={`py-3 px-3 rounded-xl border-2 font-bold text-sm sm:text-base min-h-[52px] transition-all flex items-center justify-center gap-1 ${
                     settings.language === lang
                       ? "bg-emerald-800 text-white border-emerald-900 shadow-md"
                       : "bg-white dark:bg-zinc-800 border-emerald-300 dark:border-zinc-600 hover:border-emerald-600"
@@ -160,27 +193,6 @@ export function AccessibilityCenter({ isOpen, onClose, onSettingsChange }: Acces
               role="switch"
               className={`w-14 h-8 rounded-full p-1 transition-colors min-w-[56px] min-h-[32px] flex items-center ${
                 settings.autoReadAloud ? "bg-emerald-700 justify-end" : "bg-zinc-300 dark:bg-zinc-600 justify-start"
-              }`}
-            >
-              <span className="w-6 h-6 rounded-full bg-white shadow-md block" />
-            </button>
-          </div>
-
-          {/* Simplified View */}
-          <div className="flex items-center justify-between bg-white dark:bg-zinc-800 p-4 rounded-2xl border-2 border-emerald-200 dark:border-zinc-700">
-            <div className="flex items-center gap-3">
-              <Eye className="w-6 h-6 text-emerald-700 dark:text-emerald-400" />
-              <div>
-                <p className="font-bold text-base sm:text-lg">{t.simplifiedMode}</p>
-                <p className="text-sm text-zinc-600 dark:text-zinc-400">Hide extra details to keep screens clean</p>
-              </div>
-            </div>
-            <button
-              onClick={() => updateSetting("simplified", !settings.simplified)}
-              aria-checked={settings.simplified}
-              role="switch"
-              className={`w-14 h-8 rounded-full p-1 transition-colors min-w-[56px] min-h-[32px] flex items-center ${
-                settings.simplified ? "bg-emerald-700 justify-end" : "bg-zinc-300 dark:bg-zinc-600 justify-start"
               }`}
             >
               <span className="w-6 h-6 rounded-full bg-white shadow-md block" />

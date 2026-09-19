@@ -3,6 +3,7 @@ export interface HeuristicSafetyResult {
   riskLevel: "High risk" | "Be cautious" | "Low concern";
   heuristicWarnings: string[];
   neverShareAlerts: string[];
+  extractedDomains: string[];
 }
 
 /**
@@ -14,9 +15,29 @@ export function analyzeDeterministicSafety(input: string): HeuristicSafetyResult
   const lower = text.toLowerCase();
   const warnings: string[] = [];
   const neverShare: string[] = [];
+  const extractedDomains: string[] = [];
 
   let isHighRisk = false;
   let isCautious = false;
+
+  // Extract URLs & domains safely
+  const urlMatches = text.match(/https?:\/\/[^\s]+/gi);
+  if (urlMatches) {
+    urlMatches.forEach((url) => {
+      try {
+        const domain = new URL(url).hostname;
+        if (domain && !extractedDomains.includes(domain)) {
+          extractedDomains.push(domain);
+        }
+      } catch (e) {
+        // Fallback string domain extraction
+        const match = url.match(/https?:\/\/([^\/\s]+)/i);
+        if (match && match[1] && !extractedDomains.includes(match[1])) {
+          extractedDomains.push(match[1]);
+        }
+      }
+    });
+  }
 
   // 1. Secret / Credential Requests
   if (/\b(otp|one time password|verification code|verif code|passcode)\b/i.test(text)) {
@@ -78,5 +99,25 @@ export function analyzeDeterministicSafety(input: string): HeuristicSafetyResult
     riskLevel,
     heuristicWarnings: Array.from(new Set(warnings)),
     neverShareAlerts: Array.from(new Set(neverShare)),
+    extractedDomains,
   };
+}
+
+/**
+ * Redacts secrets (OTP, PIN, passwords, credit card numbers) from text for Safe Share.
+ */
+export function redactSensitiveSecrets(rawText: string): string {
+  if (!rawText) return "";
+  let sanitized = rawText;
+
+  // Redact 4-8 digit OTP / PIN codes
+  sanitized = sanitized.replace(/\b\d{4,8}\b/g, "[REDACTED CODE]");
+
+  // Redact credit card numbers
+  sanitized = sanitized.replace(/\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/g, "[REDACTED CARD]");
+
+  // Redact explicit secret words
+  sanitized = sanitized.replace(/(otp|password|pin|cvv|passcode)\s*[:=]\s*\S+/gi, "$1: [REDACTED]");
+
+  return sanitized;
 }

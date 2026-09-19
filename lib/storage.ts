@@ -1,6 +1,9 @@
 export type TextSize = "standard" | "large" | "xlarge";
 export type ContrastMode = "standard" | "high";
 export type Language = "English" | "Hindi" | "Punjabi";
+export type ThemeMode = "light" | "dark" | "system";
+export type AssistanceLevel = "gentle" | "standard" | "independent";
+export type ExplanationLevel = "normal" | "simple" | "verysimple";
 
 export interface AccessibilitySettings {
   textSize: TextSize;
@@ -8,6 +11,10 @@ export interface AccessibilitySettings {
   simplified: boolean;
   autoReadAloud: boolean;
   language: Language;
+  theme: ThemeMode;
+  assistanceLevel: AssistanceLevel;
+  explanationLevel: ExplanationLevel;
+  hasCompletedOnboarding?: boolean;
 }
 
 export interface ReminderItem {
@@ -22,13 +29,32 @@ export interface ReminderItem {
 export interface RecentActivityItem {
   id: string;
   title: string;
-  type: "simplify" | "safety" | "guide" | "ask";
+  type: "simplify" | "safety" | "guide" | "ask" | "lens";
+  timestamp: string;
+}
+
+export interface SavedTipItem {
+  id: string;
+  taskTitle: string;
+  tip: string;
+  category?: string;
+  createdAt: string;
+}
+
+export interface ActiveTaskState {
+  title: string;
+  currentStepIndex: number;
+  totalSteps: number;
+  taskGoal: string;
+  steps: any[];
   timestamp: string;
 }
 
 const SETTINGS_KEY = "seniorsaathi_accessibility_settings";
 const REMINDERS_KEY = "seniorsaathi_reminders";
 const RECENT_KEY = "seniorsaathi_recent_activity";
+const TIPS_KEY = "seniorsaathi_saved_tips";
+const ACTIVE_TASK_KEY = "seniorsaathi_active_task";
 
 export const DEFAULT_SETTINGS: AccessibilitySettings = {
   textSize: "standard",
@@ -36,6 +62,10 @@ export const DEFAULT_SETTINGS: AccessibilitySettings = {
   simplified: false,
   autoReadAloud: false,
   language: "English",
+  theme: "system",
+  assistanceLevel: "standard",
+  explanationLevel: "normal",
+  hasCompletedOnboarding: false,
 };
 
 export function getStoredSettings(): AccessibilitySettings {
@@ -62,9 +92,28 @@ export function saveStoredSettings(settings: AccessibilitySettings): void {
 export function applyDOMAccessibilitySettings(settings: AccessibilitySettings): void {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
+  
+  // Font scaling & attributes
   root.setAttribute("data-text-size", settings.textSize);
   root.setAttribute("data-contrast", settings.contrast);
   root.setAttribute("data-simplified", settings.simplified ? "true" : "false");
+  root.setAttribute("data-assistance", settings.assistanceLevel);
+
+  // Theme application
+  let isDark = false;
+  if (settings.theme === "dark") {
+    isDark = true;
+  } else if (settings.theme === "system") {
+    isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+
+  if (isDark) {
+    root.classList.add("dark");
+    root.setAttribute("data-theme", "dark");
+  } else {
+    root.classList.remove("dark");
+    root.setAttribute("data-theme", "light");
+  }
 }
 
 export function getStoredReminders(): ReminderItem[] {
@@ -96,7 +145,7 @@ export function getStoredRecentActivities(): RecentActivityItem[] {
   }
 }
 
-export function addRecentActivity(title: string, type: "simplify" | "safety" | "guide" | "ask"): void {
+export function addRecentActivity(title: string, type: "simplify" | "safety" | "guide" | "ask" | "lens"): void {
   if (typeof window === "undefined") return;
   try {
     const existing = getStoredRecentActivities();
@@ -113,12 +162,68 @@ export function addRecentActivity(title: string, type: "simplify" | "safety" | "
   }
 }
 
+export function getStoredSavedTips(): SavedTipItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(TIPS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveStoredTip(tip: Omit<SavedTipItem, "id" | "createdAt">): SavedTipItem {
+  const existing = getStoredSavedTips();
+  const newItem: SavedTipItem = {
+    ...tip,
+    id: Date.now().toString(),
+    createdAt: new Date().toLocaleDateString(),
+  };
+  const updated = [newItem, ...existing.filter(t => t.tip !== tip.tip)];
+  if (typeof window !== "undefined") {
+    localStorage.setItem(TIPS_KEY, JSON.stringify(updated));
+  }
+  return newItem;
+}
+
+export function deleteStoredTip(id: string): void {
+  if (typeof window === "undefined") return;
+  const existing = getStoredSavedTips();
+  const updated = existing.filter(t => t.id !== id);
+  localStorage.setItem(TIPS_KEY, JSON.stringify(updated));
+}
+
+export function getActiveTaskState(): ActiveTaskState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(ACTIVE_TASK_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function saveActiveTaskState(state: ActiveTaskState | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (!state) {
+      localStorage.removeItem(ACTIVE_TASK_KEY);
+    } else {
+      localStorage.setItem(ACTIVE_TASK_KEY, JSON.stringify(state));
+    }
+  } catch (e) {
+    console.error("Could not save active task:", e);
+  }
+}
+
 export function clearAllPreferences(): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.removeItem(SETTINGS_KEY);
     localStorage.removeItem(REMINDERS_KEY);
     localStorage.removeItem(RECENT_KEY);
+    localStorage.removeItem(TIPS_KEY);
+    localStorage.removeItem(ACTIVE_TASK_KEY);
     applyDOMAccessibilitySettings(DEFAULT_SETTINGS);
   } catch (e) {
     console.error("Could not clear preferences:", e);

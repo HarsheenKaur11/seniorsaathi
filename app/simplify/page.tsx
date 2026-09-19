@@ -4,10 +4,11 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { VoiceInput } from "@/components/voice-input";
 import { TTSButton } from "@/components/tts-button";
-import { getStoredSettings, AccessibilitySettings, DEFAULT_SETTINGS, addRecentActivity } from "@/lib/storage";
+import { StuckModal } from "@/components/stuck-modal";
+import { getStoredSettings, AccessibilitySettings, DEFAULT_SETTINGS, addRecentActivity, ExplanationLevel } from "@/lib/storage";
 import { TRANSLATIONS } from "@/lib/translations";
 import { SimplifyResponse } from "@/lib/ai/schemas";
-import { FileText, ArrowLeft, Upload, X, Loader2, AlertTriangle, ArrowRight, ShieldAlert, ListChecks, Image as ImageIcon } from "lucide-react";
+import { FileText, ArrowLeft, Upload, X, Loader2, AlertTriangle, ArrowRight, ShieldAlert, ListChecks, ChevronDown, ChevronUp, HelpCircle } from "lucide-react";
 
 function SimplifyContent() {
   const searchParams = useSearchParams();
@@ -18,12 +19,18 @@ function SimplifyContent() {
   const [inputText, setInputText] = useState(initialQuery);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [explanationLevel, setExplanationLevel] = useState<ExplanationLevel>("normal");
+  const [showExpandableDetails, setShowExpandableDetails] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<SimplifyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [stuckOpen, setStuckOpen] = useState(false);
 
   useEffect(() => {
-    setSettings(getStoredSettings());
+    const loaded = getStoredSettings();
+    setSettings(loaded);
+    setExplanationLevel(loaded.explanationLevel || "normal");
   }, []);
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,7 +55,7 @@ function SimplifyContent() {
     setImagePreview(null);
   };
 
-  const handleSimplify = async (overrideText?: string) => {
+  const handleSimplify = async (overrideText?: string, levelToUse?: ExplanationLevel) => {
     const textToUse = overrideText !== undefined ? overrideText : inputText;
     if (!textToUse.trim() && !imagePreview) return;
 
@@ -56,9 +63,17 @@ function SimplifyContent() {
     setError(null);
     setResponse(null);
 
+    const activeLevel = levelToUse || explanationLevel;
+    let modifiedPrompt = textToUse.trim();
+    if (activeLevel === "verysimple") {
+      modifiedPrompt = `Explain in super simple short 1-syllable words: ${textToUse.trim()}`;
+    } else if (activeLevel === "simple") {
+      modifiedPrompt = `Explain in plain everyday words without technical jargon: ${textToUse.trim()}`;
+    }
+
     try {
       const payload: any = {
-        text: textToUse.trim(),
+        text: modifiedPrompt,
         language: settings.language,
       };
 
@@ -113,7 +128,7 @@ function SimplifyContent() {
         </button>
         <h2 className="text-2xl sm:text-3xl font-black text-emerald-950 dark:text-emerald-100 flex items-center gap-2">
           <FileText className="w-8 h-8 text-blue-600" />
-          Simplify Anything
+          Simplify Anything V2
         </h2>
       </div>
 
@@ -130,6 +145,30 @@ function SimplifyContent() {
             placeholder="Paste your confusing message, bill details, or letter here..."
             className="w-full p-4 rounded-2xl bg-emerald-50/50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-medium text-lg border-2 border-emerald-300 dark:border-zinc-600 focus:outline-hidden focus:ring-4 focus:ring-amber-400"
           />
+        </div>
+
+        {/* Explanation Level Selector */}
+        <div className="flex items-center justify-between bg-emerald-50 dark:bg-zinc-900 p-3 rounded-2xl border border-emerald-200 dark:border-zinc-700">
+          <span className="font-bold text-sm text-emerald-950 dark:text-emerald-200">Simplicity Level:</span>
+          <div className="flex gap-2">
+            {(["normal", "simple", "verysimple"] as ExplanationLevel[]).map((lvl) => (
+              <button
+                key={lvl}
+                type="button"
+                onClick={() => {
+                  setExplanationLevel(lvl);
+                  if (inputText || imagePreview) handleSimplify(inputText, lvl);
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs capitalize ${
+                  explanationLevel === lvl
+                    ? "bg-emerald-800 text-white shadow-xs"
+                    : "bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border border-zinc-300 dark:border-zinc-700"
+                }`}
+              >
+                {lvl === "normal" ? "Standard" : lvl === "simple" ? "Simpler" : "Very Simple"}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Image Preview if uploaded */}
@@ -194,7 +233,7 @@ function SimplifyContent() {
         </div>
       )}
 
-      {/* Structured Output */}
+      {/* Structured Output (Progressive Disclosure) */}
       {response && !loading && (
         <div className="bg-white dark:bg-zinc-800 p-6 sm:p-8 rounded-3xl border-3 border-blue-400 dark:border-zinc-700 shadow-xl space-y-8">
           {/* Top Bar with Read Aloud */}
@@ -203,14 +242,24 @@ function SimplifyContent() {
               Simplified Overview
             </span>
             <TTSButton
-              text={`What this means: ${response.whatThisMeans}. What you need to do: ${response.actionSteps.join(", ")}`}
+              text={`Summary: ${response.summary}. What this means: ${response.whatThisMeans}`}
               language={settings.language}
             />
           </div>
 
+          {/* IN ONE SENTENCE */}
+          <div className="p-4 bg-amber-50 dark:bg-zinc-900 border-2 border-amber-300 rounded-2xl">
+            <p className="text-xs font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider mb-1">
+              IN ONE SENTENCE
+            </p>
+            <p className="text-xl font-black text-amber-950 dark:text-amber-200">
+              💡 {response.summary}
+            </p>
+          </div>
+
           {/* Section 1: WHAT THIS MEANS */}
           <div className="space-y-3">
-            <h3 className="text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wide uppercase text-blue-900 dark:text-blue-400">
+            <h3 className="text-xl sm:text-2xl font-black text-blue-900 dark:text-blue-400 uppercase tracking-wide">
               WHAT THIS MEANS
             </h3>
             <p className="text-lg sm:text-xl text-zinc-900 dark:text-zinc-100 font-medium bg-blue-50/70 dark:bg-zinc-900 p-5 rounded-2xl border border-blue-200 dark:border-zinc-700 leading-relaxed">
@@ -220,7 +269,7 @@ function SimplifyContent() {
 
           {/* Section 2: WHAT YOU NEED TO DO */}
           <div className="space-y-3">
-            <h3 className="text-xl sm:text-2xl font-black text-emerald-950 dark:text-emerald-100 tracking-wide uppercase text-emerald-900 dark:text-emerald-400">
+            <h3 className="text-xl sm:text-2xl font-black text-emerald-900 dark:text-emerald-400 uppercase tracking-wide">
               WHAT YOU NEED TO DO
             </h3>
             <div className="space-y-3">
@@ -237,47 +286,60 @@ function SimplifyContent() {
             </div>
           </div>
 
-          {/* Section 3: IMPORTANT INFORMATION */}
-          {response.importantInfo.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xl sm:text-2xl font-black tracking-wide uppercase text-purple-900 dark:text-purple-400">
-                IMPORTANT INFORMATION
-              </h3>
-              <ul className="space-y-2">
-                {response.importantInfo.map((info, idx) => (
-                  <li key={idx} className="p-4 bg-purple-50 dark:bg-zinc-900 rounded-2xl border border-purple-200 dark:border-zinc-700 font-semibold text-lg text-purple-950 dark:text-purple-200">
-                    📌 {info}
-                  </li>
-                ))}
-              </ul>
+          {/* Expandable Details Trigger */}
+          <button
+            onClick={() => setShowExpandableDetails(!showExpandableDetails)}
+            className="w-full py-3 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-2xl font-bold flex items-center justify-between text-base min-h-[48px]"
+          >
+            <span>{showExpandableDetails ? "Hide Expandable Details" : "Show Expandable Details (Dates, Amounts, Safety)"}</span>
+            {showExpandableDetails ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+
+          {/* Expandable Details Section */}
+          {showExpandableDetails && (
+            <div className="space-y-6 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+              {response.importantInfo.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-black tracking-wide uppercase text-purple-900 dark:text-purple-400">
+                    IMPORTANT DETAILS
+                  </h3>
+                  <ul className="space-y-2">
+                    {response.importantInfo.map((info, idx) => (
+                      <li key={idx} className="p-4 bg-purple-50 dark:bg-zinc-900 rounded-2xl border border-purple-200 dark:border-zinc-700 font-semibold text-base text-purple-950 dark:text-purple-200">
+                        📌 {info}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {response.caution.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="text-lg font-black tracking-wide uppercase text-amber-900 dark:text-amber-400 flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    SAFETY CAUTIONS
+                  </h3>
+                  <div className="bg-amber-50 dark:bg-amber-950/50 border-2 border-amber-300 p-4 rounded-2xl space-y-2">
+                    <ul className="list-disc pl-6 space-y-1 font-semibold text-base text-amber-950 dark:text-amber-200">
+                      {response.caution.map((c, idx) => (
+                        <li key={idx}>{c}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Section 4: BE CAREFUL ABOUT */}
-          {response.caution.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xl sm:text-2xl font-black tracking-wide uppercase text-amber-900 dark:text-amber-400 flex items-center gap-2">
-                <AlertTriangle className="w-6 h-6 text-amber-600" />
-                BE CAREFUL ABOUT
-              </h3>
-              <div className="bg-amber-50 dark:bg-amber-950/50 border-2 border-amber-300 p-5 rounded-2xl space-y-2">
-                <ul className="list-disc pl-6 space-y-1 font-semibold text-lg text-amber-950 dark:text-amber-200">
-                  {response.caution.map((c, idx) => (
-                    <li key={idx}>{c}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-          {/* Cross-Feature Continuities */}
+          {/* Action continuities & Stuck button */}
           <div className="pt-6 border-t border-zinc-200 dark:border-zinc-700 flex flex-wrap gap-3 items-center justify-between">
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => handleSimplify(`Explain this even more simply in shorter words: ${inputText}`)}
-                className="px-4 py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-700 rounded-xl font-bold text-zinc-900 dark:text-zinc-100 min-h-[48px]"
+                onClick={() => setStuckOpen(true)}
+                className="px-4 py-3 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 text-amber-950 dark:text-amber-200 rounded-xl font-bold border border-amber-300 flex items-center gap-2 min-h-[48px]"
               >
-                Make it even simpler
+                <HelpCircle className="w-5 h-5 text-amber-600" />
+                I’m stuck
               </button>
 
               <button
@@ -299,13 +361,28 @@ function SimplifyContent() {
           </div>
         </div>
       )}
+
+      {/* Stuck Modal */}
+      <StuckModal
+        isOpen={stuckOpen}
+        onClose={() => setStuckOpen(false)}
+        contextText={inputText}
+        language={settings.language}
+        onSelectOption={(actionType) => {
+          if (actionType === "explain_simpler") {
+            handleSimplify(inputText, "verysimple");
+          } else {
+            router.push(`/guide?task=${encodeURIComponent(inputText)}`);
+          }
+        }}
+      />
     </div>
   );
 }
 
 export default function SimplifyPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Simplify...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Simplify V2...</div>}>
       <SimplifyContent />
     </Suspense>
   );

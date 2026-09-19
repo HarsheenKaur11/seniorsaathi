@@ -7,7 +7,8 @@ import { TTSButton } from "@/components/tts-button";
 import { getStoredSettings, AccessibilitySettings, DEFAULT_SETTINGS, addRecentActivity } from "@/lib/storage";
 import { TRANSLATIONS } from "@/lib/translations";
 import { AskResponse } from "@/lib/ai/schemas";
-import { HelpCircle, ArrowLeft, Loader2, Sparkles, AlertTriangle, ArrowRight, RefreshCw, Volume2 } from "lucide-react";
+import { routeUserIntent } from "@/lib/ai/intent-router";
+import { HelpCircle, ArrowLeft, Loader2, Sparkles, AlertTriangle, ArrowRight, RefreshCw, Bell, ShieldAlert, FileText, ListChecks } from "lucide-react";
 
 function AskContent() {
   const searchParams = useSearchParams();
@@ -18,6 +19,7 @@ function AskContent() {
   const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<AskResponse | null>(null);
+  const [detectedIntent, setDetectedIntent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,6 +31,10 @@ function AskContent() {
     setLoading(true);
     setError(null);
     setResponse(null);
+
+    // Parse smart intent locally
+    const routed = routeUserIntent(textToAsk.trim());
+    setDetectedIntent(routed.intent);
 
     try {
       const res = await fetch("/api/ai/ask", {
@@ -80,7 +86,7 @@ function AskContent() {
         </button>
         <h2 className="text-2xl sm:text-3xl font-black text-emerald-950 dark:text-emerald-100 flex items-center gap-2">
           <HelpCircle className="w-8 h-8 text-emerald-700" />
-          Ask Saathi
+          Ask Saathi V2
         </h2>
       </div>
 
@@ -94,7 +100,7 @@ function AskContent() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. How do I change my WhatsApp profile picture?"
+            placeholder="e.g. How do I change my WhatsApp profile picture? or Remind me to take medicine"
             className="flex-1 h-16 px-5 rounded-2xl bg-emerald-50/50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-semibold text-lg border-2 border-emerald-300 dark:border-zinc-600 focus:outline-hidden focus:ring-4 focus:ring-amber-400"
           />
           <div className="flex gap-2">
@@ -115,6 +121,29 @@ function AskContent() {
           </div>
         </div>
       </form>
+
+      {/* SMART INTENT ROUTER BANNER IF DETECTED */}
+      {detectedIntent === "REMINDER" && !loading && (
+        <div className="bg-purple-100 dark:bg-purple-950/60 border-2 border-purple-400 p-5 rounded-3xl flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Bell className="w-7 h-7 text-purple-700" />
+            <div>
+              <p className="font-black text-lg text-purple-950 dark:text-purple-200">
+                Looks like you'd like to set a Reminder!
+              </p>
+              <p className="text-sm font-semibold text-purple-900 dark:text-purple-300">
+                Would you like Saathi to create this reminder for you?
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => router.push(`/reminders?title=${encodeURIComponent(query)}`)}
+            className="px-6 py-3 bg-purple-700 hover:bg-purple-800 text-white font-black text-base rounded-2xl shadow-md flex items-center gap-2 min-h-[48px]"
+          >
+            <Bell className="w-5 h-5" /> Create Reminder Now
+          </button>
+        </div>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -247,7 +276,7 @@ function AskContent() {
 
 export default function AskPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Ask Saathi...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Ask Saathi V2...</div>}>
       <AskContent />
     </Suspense>
   );
