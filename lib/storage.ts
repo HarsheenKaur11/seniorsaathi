@@ -1,9 +1,27 @@
 export type TextSize = "standard" | "large" | "xlarge";
 export type ContrastMode = "standard" | "high";
-export type Language = "English" | "Hindi" | "Punjabi";
+export type Language = 
+  | "English" 
+  | "Hindi" 
+  | "Punjabi" 
+  | "Bengali" 
+  | "Gujarati" 
+  | "Marathi" 
+  | "Tamil" 
+  | "Telugu" 
+  | "Kannada" 
+  | "Malayalam" 
+  | "Urdu";
 export type ThemeMode = "light" | "dark" | "system";
 export type AssistanceLevel = "gentle" | "standard" | "independent";
 export type ExplanationLevel = "normal" | "simple" | "verysimple";
+
+export interface TrustedContact {
+  id: string;
+  name: string;
+  relation: string;
+  phone?: string;
+}
 
 export interface AccessibilitySettings {
   textSize: TextSize;
@@ -14,6 +32,8 @@ export interface AccessibilitySettings {
   theme: ThemeMode;
   assistanceLevel: AssistanceLevel;
   explanationLevel: ExplanationLevel;
+  calmMode: boolean;
+  oneThingAtATime: boolean;
   hasCompletedOnboarding?: boolean;
 }
 
@@ -55,6 +75,7 @@ const REMINDERS_KEY = "seniorsaathi_reminders";
 const RECENT_KEY = "seniorsaathi_recent_activity";
 const TIPS_KEY = "seniorsaathi_saved_tips";
 const ACTIVE_TASK_KEY = "seniorsaathi_active_task";
+const TRUSTED_CONTACTS_KEY = "seniorsaathi_trusted_contacts";
 
 export const DEFAULT_SETTINGS: AccessibilitySettings = {
   textSize: "standard",
@@ -65,6 +86,8 @@ export const DEFAULT_SETTINGS: AccessibilitySettings = {
   theme: "system",
   assistanceLevel: "standard",
   explanationLevel: "normal",
+  calmMode: false,
+  oneThingAtATime: false,
   hasCompletedOnboarding: false,
 };
 
@@ -98,6 +121,7 @@ export function applyDOMAccessibilitySettings(settings: AccessibilitySettings): 
   root.setAttribute("data-contrast", settings.contrast);
   root.setAttribute("data-simplified", settings.simplified ? "true" : "false");
   root.setAttribute("data-assistance", settings.assistanceLevel);
+  root.setAttribute("data-calm", settings.calmMode ? "true" : "false");
 
   // Theme application
   let isDark = false;
@@ -193,6 +217,27 @@ export function deleteStoredTip(id: string): void {
   localStorage.setItem(TIPS_KEY, JSON.stringify(updated));
 }
 
+export function getStoredTrustedContacts(): TrustedContact[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(TRUSTED_CONTACTS_KEY);
+    return raw ? JSON.parse(raw) : [
+      { id: "1", name: "Daughter", relation: "Family", phone: "" },
+    ];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveStoredTrustedContacts(contacts: TrustedContact[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(TRUSTED_CONTACTS_KEY, JSON.stringify(contacts));
+  } catch (e) {
+    console.error("Could not save trusted contacts:", e);
+  }
+}
+
 export function getActiveTaskState(): ActiveTaskState | null {
   if (typeof window === "undefined") return null;
   try {
@@ -224,6 +269,7 @@ export function clearAllPreferences(): void {
     localStorage.removeItem(RECENT_KEY);
     localStorage.removeItem(TIPS_KEY);
     localStorage.removeItem(ACTIVE_TASK_KEY);
+    localStorage.removeItem(TRUSTED_CONTACTS_KEY);
     applyDOMAccessibilitySettings(DEFAULT_SETTINGS);
   } catch (e) {
     console.error("Could not clear preferences:", e);

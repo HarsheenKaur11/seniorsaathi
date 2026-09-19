@@ -8,7 +8,20 @@ import { getStoredSettings, AccessibilitySettings, DEFAULT_SETTINGS, addRecentAc
 import { TRANSLATIONS } from "@/lib/translations";
 import { AskResponse } from "@/lib/ai/schemas";
 import { routeUserIntent } from "@/lib/ai/intent-router";
-import { HelpCircle, ArrowLeft, Loader2, Sparkles, AlertTriangle, ArrowRight, RefreshCw, Bell, ShieldAlert, FileText, ListChecks } from "lucide-react";
+import { 
+  HelpCircle, 
+  ArrowLeft, 
+  Loader2, 
+  Sparkles, 
+  AlertTriangle, 
+  ArrowRight, 
+  RefreshCw, 
+  Bell, 
+  MessageSquare,
+  ThumbsUp,
+  RotateCcw,
+  Globe
+} from "lucide-react";
 
 function AskContent() {
   const searchParams = useSearchParams();
@@ -22,15 +35,21 @@ function AskContent() {
   const [detectedIntent, setDetectedIntent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Conversational context memory turn
+  const [previousTurn, setPreviousTurn] = useState<{
+    lastQuery?: string;
+    lastAnswer?: string;
+    topic?: string;
+  } | null>(null);
+
   useEffect(() => {
     setSettings(getStoredSettings());
   }, []);
 
-  const handleAsk = async (textToAsk: string) => {
+  const handleAsk = async (textToAsk: string, overrideContext?: any) => {
     if (!textToAsk.trim()) return;
     setLoading(true);
     setError(null);
-    setResponse(null);
 
     // Parse smart intent locally
     const routed = routeUserIntent(textToAsk.trim());
@@ -43,6 +62,8 @@ function AskContent() {
         body: JSON.stringify({
           query: textToAsk.trim(),
           language: settings.language,
+          explanationLevel: settings.explanationLevel,
+          previousContext: overrideContext || previousTurn,
         }),
       });
 
@@ -52,6 +73,12 @@ function AskContent() {
       }
 
       setResponse(json.data);
+      setPreviousTurn({
+        lastQuery: textToAsk.trim(),
+        lastAnswer: json.data.simpleAnswer,
+        topic: json.data.intent,
+      });
+
       addRecentActivity(`Ask: ${textToAsk.slice(0, 25)}...`, "ask");
     } catch (e: any) {
       setError(e?.message || "Connection error. Please try again.");
@@ -74,19 +101,19 @@ function AskContent() {
   const t = TRANSLATIONS[settings.language] || TRANSLATIONS.English;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-8">
+    <div className="space-y-6 max-w-4xl mx-auto pb-8 font-sans">
       {/* Top Header */}
       <div className="flex items-center justify-between gap-4">
         <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 rounded-xl font-bold hover:bg-emerald-200 min-h-[48px]"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 rounded-xl font-bold hover:bg-emerald-200 min-h-[48px] cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
           {t.back}
         </button>
         <h2 className="text-2xl sm:text-3xl font-black text-emerald-950 dark:text-emerald-100 flex items-center gap-2">
           <HelpCircle className="w-8 h-8 text-emerald-700" />
-          Ask Saathi V2
+          Ask Saathi V3
         </h2>
       </div>
 
@@ -100,7 +127,7 @@ function AskContent() {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. How do I change my WhatsApp profile picture? or Remind me to take medicine"
+            placeholder="e.g. How do I change WhatsApp profile photo? or What is UPI?"
             className="flex-1 h-16 px-5 rounded-2xl bg-emerald-50/50 dark:bg-zinc-900 text-zinc-900 dark:text-white font-semibold text-lg border-2 border-emerald-300 dark:border-zinc-600 focus:outline-hidden focus:ring-4 focus:ring-amber-400"
           />
           <div className="flex gap-2">
@@ -114,7 +141,7 @@ function AskContent() {
             <button
               type="submit"
               disabled={loading}
-              className="h-16 px-6 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-lg rounded-2xl shadow-md min-w-[100px] flex items-center justify-center gap-2 disabled:opacity-50"
+              className="h-16 px-6 bg-emerald-800 hover:bg-emerald-700 text-white font-bold text-lg rounded-2xl shadow-md min-w-[100px] flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Ask"}
             </button>
@@ -138,7 +165,7 @@ function AskContent() {
           </div>
           <button
             onClick={() => router.push(`/reminders?title=${encodeURIComponent(query)}`)}
-            className="px-6 py-3 bg-purple-700 hover:bg-purple-800 text-white font-black text-base rounded-2xl shadow-md flex items-center gap-2 min-h-[48px]"
+            className="px-6 py-3 bg-purple-700 hover:bg-purple-800 text-white font-black text-base rounded-2xl shadow-md flex items-center gap-2 min-h-[48px] cursor-pointer"
           >
             <Bell className="w-5 h-5" /> Create Reminder Now
           </button>
@@ -150,7 +177,7 @@ function AskContent() {
         <div className="bg-amber-50 dark:bg-zinc-800 border-2 border-amber-300 p-8 rounded-3xl text-center space-y-3">
           <Loader2 className="w-10 h-10 text-emerald-700 animate-spin mx-auto" />
           <p className="text-xl font-bold text-emerald-950 dark:text-amber-200">
-            “Saathi is reading your question carefully...”
+            “Saathi is thinking about your question carefully...”
           </p>
         </div>
       )}
@@ -164,7 +191,7 @@ function AskContent() {
           </div>
           <button
             onClick={() => handleAsk(query)}
-            className="px-5 py-3 bg-red-600 text-white rounded-xl font-bold flex items-center gap-2 min-h-[48px]"
+            className="px-5 py-3 bg-red-600 text-white rounded-xl font-bold flex items-center gap-2 min-h-[48px] cursor-pointer"
           >
             <RefreshCw className="w-5 h-5" /> Try Again
           </button>
@@ -173,7 +200,7 @@ function AskContent() {
 
       {/* Structured AI Response */}
       {response && !loading && (
-        <div className="bg-white dark:bg-zinc-800 p-6 sm:p-8 rounded-3xl border-3 border-emerald-400 dark:border-zinc-700 shadow-xl space-y-6">
+        <div className="bg-white dark:bg-zinc-800 p-6 sm:p-8 rounded-3xl border-3 border-emerald-400 dark:border-zinc-700 shadow-xl space-y-6 animate-in fade-in duration-200">
           {/* Top Bar with Read Aloud */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100 dark:border-zinc-700 pb-4">
             <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-300 rounded-full font-bold text-sm uppercase">
@@ -226,32 +253,36 @@ function AskContent() {
             </div>
           )}
 
-          {/* Next Steps */}
-          {response.nextSteps.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-lg sm:text-xl font-bold text-emerald-950 dark:text-emerald-200">
-                What to do next
-              </h4>
-              <div className="space-y-2">
-                {response.nextSteps.map((step, idx) => (
-                  <div key={idx} className="p-4 bg-emerald-50 dark:bg-zinc-900 rounded-xl border border-emerald-200 dark:border-zinc-700 font-semibold text-base sm:text-lg text-emerald-950 dark:text-emerald-200">
-                    {step}
-                  </div>
-                ))}
-              </div>
+          {/* DYNAMIC CONTEXTUAL FOLLOW-UP CONTROLS */}
+          <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-zinc-900 border border-emerald-200 dark:border-zinc-700 space-y-3">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+              Follow-up with Saathi (Contextual Memory)
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleAsk("Give me an everyday example for this.")}
+                className="px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-emerald-300 dark:border-zinc-600 font-semibold text-sm hover:border-emerald-600 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles className="w-4 h-4 text-amber-500" /> Give me an example
+              </button>
+              <button
+                onClick={() => handleAsk("Make this even simpler for me.")}
+                className="px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-emerald-300 dark:border-zinc-600 font-semibold text-sm hover:border-emerald-600 flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-4 h-4 text-emerald-600" /> Make it simpler
+              </button>
+              <button
+                onClick={() => handleAsk(`Translate this explanation into ${settings.language === "Hindi" ? "Punjabi" : "Hindi"}.`)}
+                className="px-4 py-2.5 rounded-xl bg-white dark:bg-zinc-800 border border-emerald-300 dark:border-zinc-600 font-semibold text-sm hover:border-emerald-600 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Globe className="w-4 h-4 text-blue-600" /> Translate explanation
+              </button>
             </div>
-          )}
+          </div>
 
-          {/* Interactive Controls & Action Transition */}
-          <div className="pt-4 border-t border-emerald-200 dark:border-zinc-700 flex flex-wrap gap-3 items-center justify-between">
-            <button
-              onClick={() => handleAsk(`Please explain this even more simply: ${query}`)}
-              className="px-5 py-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 dark:bg-zinc-700 font-bold text-emerald-950 dark:text-emerald-200 min-h-[48px]"
-            >
-              Explain more simply
-            </button>
-
-            {response.suggestedAction && (
+          {/* Suggested Primary Action */}
+          {response.suggestedAction && (
+            <div className="pt-2 flex justify-end">
               <button
                 onClick={() => {
                   if (response.suggestedAction?.action === "guide") {
@@ -262,12 +293,12 @@ function AskContent() {
                     router.push(`/safety?q=${encodeURIComponent(response.suggestedAction.prompt || query)}`);
                   }
                 }}
-                className="px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-black text-lg flex items-center gap-2 shadow-md min-h-[48px]"
+                className="px-6 py-3 rounded-2xl bg-amber-400 hover:bg-amber-300 text-emerald-950 font-black text-lg flex items-center gap-2 shadow-md min-h-[48px] cursor-pointer"
               >
                 {response.suggestedAction.label} <ArrowRight className="w-5 h-5" />
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -276,7 +307,7 @@ function AskContent() {
 
 export default function AskPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Ask Saathi V2...</div>}>
+    <Suspense fallback={<div className="p-8 text-center text-lg font-bold">Loading Ask Saathi V3...</div>}>
       <AskContent />
     </Suspense>
   );

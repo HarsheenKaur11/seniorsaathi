@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TTSButton } from "@/components/tts-button";
+import { SaathiCircleModal } from "@/components/saathi-circle-modal";
 import { getStoredSettings, AccessibilitySettings, DEFAULT_SETTINGS, addRecentActivity } from "@/lib/storage";
 import { TRANSLATIONS } from "@/lib/translations";
 import { LensResponse } from "@/lib/ai/schemas";
-import { Camera, ArrowLeft, Upload, X, Loader2, AlertTriangle, ArrowRight, ListChecks, ShieldAlert, Eye, MapPin } from "lucide-react";
+import { Camera, ArrowLeft, Upload, X, Loader2, AlertTriangle, ArrowRight, ListChecks, ShieldAlert, MapPin, Users, Sparkles } from "lucide-react";
 
 export default function SaathiLensPage() {
   const router = useRouter();
@@ -18,6 +19,9 @@ export default function SaathiLensPage() {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState<LensResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Saathi Circle modal
+  const [circleOpen, setCircleOpen] = useState(false);
 
   useEffect(() => {
     setSettings(getStoredSettings());
@@ -85,21 +89,28 @@ export default function SaathiLensPage() {
   const t = TRANSLATIONS[settings.language] || TRANSLATIONS.English;
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto pb-8">
+    <div className="space-y-6 max-w-4xl mx-auto pb-8 font-sans">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <button
           onClick={() => router.push("/")}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 rounded-xl font-bold hover:bg-emerald-200 min-h-[48px]"
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-100 dark:bg-emerald-950 text-emerald-900 dark:text-emerald-200 rounded-xl font-bold hover:bg-emerald-200 min-h-[48px] cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
           Back
         </button>
         <h2 className="text-2xl sm:text-3xl font-black text-blue-950 dark:text-blue-100 flex items-center gap-2">
           <Camera className="w-8 h-8 text-amber-500" />
-          Saathi Lens
+          Saathi Lens (Show Me)
         </h2>
       </div>
+
+      {/* Saathi Circle Modal */}
+      <SaathiCircleModal
+        isOpen={circleOpen}
+        onClose={() => setCircleOpen(false)}
+        rawSummaryToShare={response ? `Saathi Lens analysis: "${response.whatItIs}". ${response.whatItMeans}` : undefined}
+      />
 
       {/* Upload Form */}
       <form onSubmit={handleInspectScreen} className="bg-white dark:bg-zinc-800 p-6 sm:p-8 rounded-3xl border-3 border-blue-300 dark:border-zinc-700 shadow-md space-y-5">
@@ -108,7 +119,7 @@ export default function SaathiLensPage() {
             Upload a photo or screenshot of any screen or document:
           </label>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            You can upload banking screenshots, phone settings, web pages, bills, or app errors.
+            Saathi Lens will inspect the actual image and explain what options appear on screen.
           </p>
         </div>
 
@@ -129,7 +140,7 @@ export default function SaathiLensPage() {
             <button
               type="button"
               onClick={removeImage}
-              className="absolute top-4 right-4 p-3 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-xl min-w-[48px] min-h-[48px] flex items-center justify-center"
+              className="absolute top-4 right-4 p-3 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-xl min-w-[48px] min-h-[48px] flex items-center justify-center cursor-pointer"
               title="Remove image"
             >
               <X className="w-6 h-6" />
@@ -150,7 +161,7 @@ export default function SaathiLensPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white font-black text-xl rounded-2xl shadow-lg flex items-center justify-center gap-2 min-h-[56px] disabled:opacity-50"
+              className="w-full py-4 bg-blue-700 hover:bg-blue-800 text-white font-black text-xl rounded-2xl shadow-lg flex items-center justify-center gap-2 min-h-[56px] disabled:opacity-50 cursor-pointer"
             >
               {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : "Inspect Screen with Saathi Lens"}
             </button>
@@ -177,12 +188,20 @@ export default function SaathiLensPage() {
 
       {/* Saathi Lens Inspection Output */}
       {response && !loading && (
-        <div className="bg-white dark:bg-zinc-800 p-6 sm:p-8 rounded-3xl border-3 border-blue-500 dark:border-zinc-700 shadow-xl space-y-8">
+        <div className="bg-white dark:bg-zinc-800 p-6 sm:p-8 rounded-3xl border-3 border-blue-500 dark:border-zinc-700 shadow-xl space-y-8 animate-in fade-in duration-200">
           {/* Top Header */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 dark:border-zinc-700 pb-4">
-            <span className="px-3 py-1 bg-amber-400 text-blue-950 rounded-full font-black text-xs uppercase">
-              Saathi Lens Analysis
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1 bg-amber-400 text-blue-950 rounded-full font-black text-xs uppercase">
+                Saathi Lens Analysis
+              </span>
+              <button
+                onClick={() => setCircleOpen(true)}
+                className="px-3 py-1 bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-full font-bold text-xs flex items-center gap-1 border border-blue-500/30 cursor-pointer"
+              >
+                <Users className="w-3.5 h-3.5" /> Ask Someone I Trust
+              </button>
+            </div>
 
             <TTSButton
               text={`${response.whatItIs}. ${response.whatItMeans}`}
@@ -210,12 +229,12 @@ export default function SaathiLensPage() {
             </p>
           </div>
 
-          {/* SCREEN CONTROL LOCATOR HINT */}
+          {/* SPATIAL SCREEN EXPLAINER LOCATION HINT */}
           {response.screenControlHint && (
             <div className="p-5 bg-amber-100 dark:bg-amber-950/60 border-2 border-amber-400 rounded-2xl space-y-1">
               <p className="font-black text-lg text-amber-950 dark:text-amber-200 flex items-center gap-2">
                 <MapPin className="w-6 h-6 text-amber-600" />
-                Screen Location Hint
+                Spatial Screen Location Hint (Show Me)
               </p>
               <p className="text-lg font-semibold text-amber-900 dark:text-amber-300">
                 {response.screenControlHint}
@@ -239,35 +258,18 @@ export default function SaathiLensPage() {
             </div>
           )}
 
-          {/* SUSPICIOUS FLAGS */}
-          {response.suspiciousFlags.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-xl font-black text-red-600 dark:text-red-400 uppercase tracking-wide flex items-center gap-2">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-                SUSPICIOUS FLAGS DETECTED
-              </h3>
-              <div className="bg-red-50 dark:bg-red-950/60 border-2 border-red-300 p-4 rounded-2xl space-y-2 text-red-900 dark:text-red-200">
-                <ul className="list-disc pl-6 space-y-1 font-semibold text-lg">
-                  {response.suspiciousFlags.map((flag, idx) => (
-                    <li key={idx}>{flag}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
           {/* ACTION BUTTONS */}
           <div className="pt-6 border-t border-zinc-200 dark:border-zinc-700 flex flex-wrap gap-4 items-center justify-between">
             <button
               onClick={() => router.push(`/safety?q=${encodeURIComponent(response.whatItIs)}`)}
-              className="px-5 py-3 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 text-amber-900 dark:text-amber-200 rounded-xl font-bold border border-amber-300 flex items-center gap-2 min-h-[48px]"
+              className="px-5 py-3 bg-amber-100 hover:bg-amber-200 dark:bg-amber-950 text-amber-900 dark:text-amber-200 rounded-xl font-bold border border-amber-300 flex items-center gap-2 min-h-[48px] cursor-pointer"
             >
               <ShieldAlert className="w-5 h-5" /> Check Safety of Screen
             </button>
 
             <button
               onClick={() => router.push(`/guide?task=${encodeURIComponent(response.guidedTaskPrompt || response.whatItIs)}`)}
-              className="px-8 py-4 bg-emerald-800 hover:bg-emerald-700 text-white font-black text-xl rounded-2xl flex items-center gap-2 shadow-lg min-h-[56px]"
+              className="px-8 py-4 bg-emerald-800 hover:bg-emerald-700 text-white font-black text-xl rounded-2xl flex items-center gap-2 shadow-lg min-h-[56px] cursor-pointer"
             >
               <ListChecks className="w-6 h-6 text-amber-300" /> Guide me step-by-step
             </button>
